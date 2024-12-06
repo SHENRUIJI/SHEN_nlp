@@ -5,29 +5,27 @@ from yargy.pipelines import morph_pipeline
 from yargy.predicates import dictionary, is_capitalized, type as yargy_type, gram, normalized
 from yargy.interpretation import fact
 
-# 预定义的类别列表
+# Предопределенный список категорий
 categories = ['science', 'style', 'culture', 'life', 'economics', 'business', 'travel', 'forces', 'media', 'sport']
 
-
-# 定义数据结构保存提取的实体信息
+# Класс для хранения извлеченной информации
 @dataclass
 class Entry:
-    names: List[str] = None
-    birth_dates: List[str] = None
-    birth_places: List[str] = None
+    names: List[str] = None  # Имена
+    birth_dates: List[str] = None  # Даты рождения
+    birth_places: List[str] = None  # Места рождения
 
     def __post_init__(self):
         self.names = [] if self.names is None else self.names
         self.birth_dates = [] if self.birth_dates is None else self.birth_dates
         self.birth_places = [] if self.birth_places is None else self.birth_places
 
-
-# 定义命名实体的模式
+# Определение структуры имен, дат и мест
 Name = fact('Name', ['first', 'last'])
 Date = fact('Date', ['day', 'month', 'year'])
 Place = fact('Place', ['location'])
 
-# 姓名规则
+# Правило для распознавания имени
 NAME = rule(
     and_(
         is_capitalized(),
@@ -39,7 +37,7 @@ NAME = rule(
     ).interpretation(Name.last)
 ).interpretation(Name)
 
-# 日期规则
+# Правило для распознавания даты
 MONTHS = morph_pipeline([
     'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
     'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
@@ -50,13 +48,13 @@ DATE = rule(
     yargy_type('INT').interpretation(Date.year)
 ).interpretation(Date)
 
-# 出生地规则
+# Правило для распознавания места рождения
 PLACE = rule(
     dictionary({'город', 'село', 'поселок', 'деревня'}),
     is_capitalized().interpretation(Place.location)
 ).interpretation(Place)
 
-# 增加上下文信息
+# Контекст для определения информации о рождении
 BIRTH_CONTEXT = or_(
     normalized('родился'),
     normalized('рожден'),
@@ -64,39 +62,32 @@ BIRTH_CONTEXT = or_(
     normalized('рождена')
 )
 
-# 将 BIRTH_CONTEXT 包装成规则对象
 BIRTH_CONTEXT_RULE = rule(BIRTH_CONTEXT)
 
-# 解析器
+# Парсеры для различных типов данных
 parser_name = Parser(NAME)
 parser_date = Parser(DATE)
 parser_place = Parser(PLACE)
 parser_birth_context = Parser(BIRTH_CONTEXT_RULE)
 
-
-# 从段落中提取信息的函数
+# Функция для извлечения информации из параграфа
 def extract_data(content):
     entry = Entry()
 
-    # 提取姓名
     name_matches = list(parser_name.findall(content))
     entry.names = [' '.join(_.fact.as_json.values()) for _ in name_matches]
 
-    # 提取出生日期
     date_matches = list(parser_date.findall(content))
     entry.birth_dates = [' '.join(_.fact.as_json.values()) for _ in date_matches]
 
-    # 提取出生地
     place_matches = list(parser_place.findall(content))
     entry.birth_places = [_.fact.location for _ in place_matches]
 
-    # 如果没有提取到信息，尝试结合上下文信息
     if not entry.names or not entry.birth_dates or not entry.birth_places:
         context_content = content.lower()
         birth_context_matches = list(parser_birth_context.findall(context_content))
 
         if birth_context_matches:
-            # 尝试重新提取
             name_matches = list(parser_name.findall(context_content))
             date_matches = list(parser_date.findall(context_content))
             place_matches = list(parser_place.findall(context_content))
@@ -107,8 +98,7 @@ def extract_data(content):
 
     return entry
 
-
-# 逐段读取文件并解析内容
+# Функция для чтения файла построчно и обработки его содержимого
 def process_file_paragraphs(file_path):
     entries_with_categories = []
     paragraph_number = 0
@@ -119,20 +109,18 @@ def process_file_paragraphs(file_path):
             parts = line.strip().split('\t')
             if len(parts) == 3:
                 category, title, content = parts
-                # 只处理预定义类别的段落
                 if category in categories:
-                    print(f"Processing paragraph {paragraph_number} from category: {category}")  # 调试信息
+                    print(f"Обработка параграфа {paragraph_number} из категории: {category}")
                     entry = extract_data(content)
                     entries_with_categories.append((category, entry))
 
     return entries_with_categories
 
-
-# 使用您的 txt 文件路径
+# Путь к файлу
 file_path = r"D:\Projects\Pycharm_projects\NLP\nlp-2024-main\data\news.txt\news.txt"
 entries_with_categories = process_file_paragraphs(file_path)
 
-# 保存所有段落的提取结果到一个文件
+# Сохранение результатов в файл
 output_file_all = 'Results.txt'
 with open(output_file_all, 'w', encoding='utf-8') as all_entries_file:
     for i, (category, entry) in enumerate(entries_with_categories, 1):
@@ -152,6 +140,6 @@ with open(output_file_all, 'w', encoding='utf-8') as all_entries_file:
         else:
             all_entries_file.write("Место рождения: нет\n")
 
-        all_entries_file.write("\n")  # 空行分隔
+        all_entries_file.write("\n") 
 
-print(f"All entries have been saved to {output_file_all}")
+print(f"Все записи сохранены в файл {output_file_all}")
